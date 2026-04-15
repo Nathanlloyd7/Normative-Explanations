@@ -16,7 +16,8 @@
    abdemo([holdsAt(plant_safe, t)], Residue). %explain fluent
    abdemo([happens(celebrate,t)],R). % explain behavior conditional on fluent
    abdemo([happens(sleep,t)],R). % explain behavior conditional on behavior
-   
+   abdemo([happens(drain_tank, p)], R) % explain a previously unexplained action
+   abdemo([holdsAt(tank_empty, p)], R) % the previous way you would have to explain above
    
    Normative Example: 
    abdemo([happens(get_bin_in,t)],R).
@@ -26,6 +27,9 @@
    
    By modifying the preconditions or neg() them or the expectations you can bring about
    different outcomes
+   
+   The normative example interferes with the initial extension to chemical plant example.
+   Crtl+f for "IMPORTANT"
 	
    
 */
@@ -838,10 +842,14 @@ axiom(initially(nor_exp(sanction)),[]).
 % Do not encode preconditions like above do it as below.
 axiom(precondition(celebrate, plant_safe)).
 axiom(action_precondition(sleep, celebrate)).
+axiom(precondition(drain_tank, pressure_normal)). % explaining events in the system already
 
 % Added preconditions for Norms (general)
-axiom(precondition(E, emp_exp(E))).
-axiom(precondition(E, nor_exp(E))).
+% IMPORTANT - if you are testing sleep and celebrate, below made every action depend on normative fluent
+% Comment these out if abdemo([happens(sleep, t)], R) doesn't work and you should get what is in the paper.
+% % Or uncomment them if you want to test the normative part.
+%axiom(precondition(E, emp_exp(E))).
+%axiom(precondition(E, nor_exp(E))).
 
 % Added preconditions for primary norm
 axiom(precondition(get_bin_in, trash_collected)).
@@ -944,7 +952,7 @@ ensure_time(T) :-
 
 ensure_time(_).
 fresh_time(T) :-
-    gensym(t, T).
+    gensym(p, T).
 
 /* Abduction policy */
 
