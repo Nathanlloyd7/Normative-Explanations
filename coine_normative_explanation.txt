@@ -141,7 +141,7 @@ abdemo([happens(A,T)|Gs],R1,R2,N1,N3) :-
     abresolve(happens(A,T), R2, [], R3, _),
     abdemo(Gs, R3, R4, N2, N4).
 */
-abdemo([happens(A,T)|Gs],R1,R4,N1,N4) :-
+abdemo([happens(A,T)|Gs],R1,R4,N1,N4) :-  % <-- Changed R3 to R4 here
     executable(A),
 
     % Preconditions are resolved first
@@ -842,6 +842,7 @@ axiom(initially(nor_exp(sanction)),[]).
 % Do not encode preconditions like above do it as below.
 axiom(precondition(celebrate, plant_safe)).
 axiom(action_precondition(sleep, celebrate)).
+
 axiom(precondition(drain_tank, pressure_normal)). % explaining events in the system already
 
 % Added preconditions for Norms (general)
@@ -952,7 +953,7 @@ ensure_time(T) :-
 
 ensure_time(_).
 fresh_time(T) :-
-    gensym(p, T).
+    gensym(d, T).
 
 /* Abduction policy */
 
@@ -984,5 +985,3 @@ initially(neg(bin_out)).
 initially(neg(trash_collected)).
 initially(neg(happy)).
 initially(neg(punished)).
-
-
