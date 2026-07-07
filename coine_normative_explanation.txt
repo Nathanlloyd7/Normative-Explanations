@@ -103,44 +103,6 @@ abdemo([happens(A,T)|Gs],R1,R2,N1,N3) :-
     abdemo(Gs,R1,R2,N1,N3).
 
 
-% Delete this clause because it treats happens/2 as a derived predicate, which contradicts EC's abductive semantics and forces time
-% % skilemisation downstream we do not want this.
-%
-%abdemo([happens(A,T)|Gs1],R1,R3,N1,N4) :-
-%     executable(A),
-%     %FIND CONDITIONS IN AXIOM
-%     axiom(happens(A, T), Gs2),
-%     append(Gs2,Gs1,Gs3),
-%     abdemo(Gs3,R1,R3,N1,N4).
-%abdemo([happens(A,T)|Gs],R1,R3,N1,N4) :-
-%    executable(A),
-%    event_preconditions(A,T,Ps),
-%    append(Ps,Gs,Gs2),
-%    abresolve(happens(A,T),R1,[],R2,_),
-%    abdemo(Gs2,R2,R3,N1,N4).
-
-/* Above solution
- * The times collapsed to 0 because before/2 goals were generated but never resolved;
- * reordering abdemo/5 so temporal preconditions are processed before abducing the event
- *  restores proper partial-order time structure.
- * */
-/*abdemo([happens(A,T)|Gs],R1,R3,N1,N4) :-
-    executable(A),
-    event_preconditions(A,T,Ps),
-    % resolve preconditions (including before/2) FIRST
-    abdemo(Ps, R1, R2, N1, N2),
-    % now abduce the event with temporal constraints in place
-    abresolve(happens(A,T), R2, [], R3, _),
-    abdemo(Gs, R3, R4, N2, N4).
-*/
-/* abdemo([happens(A,T)|Gs],R1,R3,N1,N4) :-
-    executable(A),
-    event_preconditions(A,T,Ps),
-    abdemo(Ps, R1, R2, N1, N2),
-    enforce_diff_times(A,T,R2),
-    abresolve(happens(A,T), R2, [], R3, _),
-    abdemo(Gs, R3, R4, N2, N4).
-*/
 abdemo([happens(A,T)|Gs],R1,R4,N1,N4) :-  % <-- Changed R3 to R4 here
     executable(A),
 
@@ -906,34 +868,29 @@ axiom(diff_time(get_bin_in, collect_trash)).
 % -------------------------
 % fluent preconditions
 % -------------------------
-event_preconditions(A,T,Ps) :-
-    axiom(precondition(A,_)),              % <--- enforce existence
+% =================================================================
+% UNIFIED EVENT PRECONDITIONS
+% Gathers both fluent and action preconditions safely into a single list
+% =================================================================
+event_preconditions(A, T, Ps) :-
+    % 1. Gather fluent preconditions (giving each fluent its own fresh time variable)
     findall(
-        [holdsAt(F,Tp), before(Tp,T)],
-        axiom(precondition(A,F)),
-        Pss
+        [holdsAt(F, Tp), before(Tp, T)],
+        (axiom(precondition(A, F)), fresh_time(Tp)), 
+        FluentPss
     ),
-    flatten(Pss, Ps),
-    Ps \= [].
+    flatten(FluentPss, FluentPs),
 
-% -------------------------
-% action preconditions
-% -------------------------
-event_preconditions(A,T,Ps) :-
-    axiom(action_precondition(A,_)),       % <--- enforce existence
+    % 2. Gather action preconditions (giving each action its own fresh time variable)
     findall(
-        [happens(A2,Tp), before(Tp,T)],
-        axiom(action_precondition(A,A2)),
-        Pss
+        [happens(A2, Ta), before(Ta, T)],
+        (axiom(action_precondition(A, A2)), A2 \== none, fresh_time(Ta)),
+        ActionPss
     ),
-    flatten(Pss, Ps),
-    Ps \= [].
+    flatten(ActionPss, ActionPs),
 
-% -------------------------
-% explicit "no preconditions"
-% -------------------------
-event_preconditions(A,_,[]) :-
-    axiom(action_precondition(A, none)).
+    % 3. Combine them together
+    append(FluentPs, ActionPs, Ps).
 
 
 
@@ -985,3 +942,26 @@ initially(neg(bin_out)).
 initially(neg(trash_collected)).
 initially(neg(happy)).
 initially(neg(punished)).
+
+% Example top-level query adjustment
+find_explanations(Goals, [RH, CleanRB]) :-
+    abdemo(Goals, [[], []], [RH, RB], [], _),
+    transitive_reduction(RB, CleanRB).
+
+% Clean up redundant temporal constraints for display
+transitive_reduction(RB, CleanRB) :-
+    include(is_before, RB, Befores),
+    exclude(is_redundant(Befores), Befores, CleanRB).
+
+is_before(before(_,_)).
+
+% A link X -> Y is redundant if there exists a longer path X -> Z -> ... -> Y
+is_redundant(Befores, before(X, Y)) :-
+    member(before(X, Z), Befores),
+    X \= Z, Z \= Y,
+    has_path(Z, Y, Befores).
+
+has_path(X, X, _).
+has_path(X, Y, Befores) :-
+    member(before(X, Z), Befores),
+    has_path(Z, Y, Befores).
